@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flow Equipment Simulator (FES) — Wellhead & Choke (Trainer + Dynamics)</title>
+
+<!-- ===== Polished, modern styles ===== -->
+<style>
+  :root{
+    --bg: #0f172a;            /* slate-900 */
+    --bg-elev: #111827;       /* gray-900 */
+    --card: #0b1220;          /* deep indigo */
+    --card-2: #0e1626;
+    --ink: #e5e7eb;           /* gray-200 */
+    --muted: #9ca3af;         /* gray-400 */
+    --border: rgba(148,163,184,.18);
+    --ring:  #3b82f6;         /* blue-500 */
+    --accent:#2563eb;
+    --good:  #22c55e;
+    --bad:   #ef4444;
+    --warn:  #f59e0b;
+    --flow-color:#60a5fa;     /* blue-400 */
+    --shadow: 0 8px 24px rgba(2,6,23,.32), inset 0 1px 0 rgba(255,255,255,.025);
+    --radius: 14px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height:100%; }
+  body{
+    margin:0; color:var(--ink); background:
+      radial-gradient(1200px 600px at 20% -20%, #14203b 0%, transparent 55%),
+      radial-gradient(1200px 600px at 120% 10%, #0c1a31 0%, transparent 50%),
+      var(--bg);
+    font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji", "Segoe UI Symbol";
+    letter-spacing:.2px;
+  }
+
+  /* ===== Top navigation ===== */
+  .topnav{
+    position:sticky; top:0; z-index:40;
+    backdrop-filter: saturate(140%) blur(6px);
+    background: linear-gradient( to bottom, rgba(2,6,23,.65), rgba(2,6,23,.35) );
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar{
+    max-width:1200px; margin:0 auto; padding:10px 14px;
+    display:flex; align-items:center; gap:12px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.3px;
+  }
+  .logo{
+    width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#1e293b,#0ea5e9);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 6px 14px rgba(59,130,246,.25);
+  }
+  .tabs{ margin-left:auto; display:flex; gap:8px; }
+  .tab{
+    appearance:none; border:1px solid var(--border); color:var(--ink);
+    background:linear-gradient(180deg, #0f172a, #0b1220); box-shadow: var(--shadow);
+    border-radius: 10px; padding:8px 12px; cursor:pointer; font-weight:600;
+    transition: transform .06s ease, border-color .2s, background .2s;
+  }
+  .tab:hover{ transform: translateY(-1px); border-color:#475569; }
+  .tab.active{ border-color:var(--ring); outline: 0; background:linear-gradient(180deg, #0f1f3b, #0e1a30); }
+
+  /* ===== Layout ===== */
+  .page{ display:none; }
+  .page.active{ display:block; }
+  .wrap{ max-width:1200px; margin:0 auto; padding:14px; }
+  .grid{
+    display:grid; gap:12px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .full { grid-column: 1 / -1; }
+
+  /* ===== Cards ===== */
+  .panel{
+    background: linear-gradient(180deg, var(--card), var(--card-2));
+    border:1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding:12px;
+  }
+  .panel h3{ margin:0 0 8px; font-size:14px; color:#cbd5e1; text-transform:uppercase; letter-spacing:.12em; }
+
+  /* ===== Inputs / controls ===== */
+  .form-grid{
+    display:grid; gap:10px;
+    grid-template-columns: repeat(2, minmax(220px,1fr));
+  }
+  .field{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(148,163,184,.06);
+    border:1px solid var(--border); border-radius:12px; padding:8px 10px; }
+  .field label{ color:var(--muted); font-weight:600; font-size:12px; letter-spacing:.06em; }
+  .field input, .field select, .field textarea{
+    width:160px; padding:7px 9px; border-radius:8px;
+    background:#0a1221; color:var(--ink); border:1px solid #334155; outline:0;
+  }
+  .field input[type="range"]{ width:160px; padding:0; background:transparent; border:none; }
+  .help{ color:var(--muted); font-size:12px; }
+
+  .actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .btn{
+    appearance:none; cursor:pointer;
+    border:1px solid var(--border); color:var(--ink);
+    background: linear-gradient(180deg, #0f172a, #0b1220);
+    padding:8px 12px; border-radius:10px; font-weight:600; box-shadow: var(--shadow);
+  }
+  .btn:hover{ border-color:#64748b; transform: translateY(-1px); }
+  .btn.primary{ background:linear-gradient(180deg, #1d4ed8, #1e40af); border-color:#60a5fa; }
+  .btn.danger{ background:linear-gradient(180deg, #7f1d1d, #450a0a); border-color:#ef4444; }
+  .btn.ghost{ background:linear-gradient(180deg, #0b1220, #0b1220); }
+
+  .pill{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:12px; padding:4px 10px; border-radius:999px;
+    border:1px solid var(--border); background:rgba(148,163,184,.08); color:#cbd5e1;
+  }
+  .pill.good{ border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#bbf7d0; }
+  .pill.bad{  border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.08); color:#fecaca; }
+
+  .muted{ color:var(--muted); font-size:12px; }
+
+  /* ===== Diagram ===== */
+  .diagram-outer{
+    overflow:auto; border:1px dashed rgba(148,163,184,.25); border-radius: 12px;
+    background:linear-gradient(180deg, rgba(51,65,85,.18), rgba(30,41,59,.12));
+    max-height: 540px; /* tighter to keep on one screen */
+  }
+  .diagram-inner { --zoom:.9; transform: scale(var(--zoom)); transform-origin: top left; width: 1200px; height: 640px; }
+  svg { background:#fff; border-radius:12px; }
+
+  /* Pipes / flow */
+  .pipe { stroke-width:14; stroke-linecap:round; }
+  .choke-pipe { stroke-width:18; stroke-linecap:round; }
+  .idle-yellow { stroke:#e6c300; }
+  .idle-red    { stroke:#cc3333; }
+  .flowing { stroke:var(--flow-color); stroke-dasharray:20; animation: flow 1.2s linear infinite; }
+  .flowing-static { stroke:var(--flow-color); }
+  @keyframes flow { to { stroke-dashoffset:-40; } }
+
+  .gauge-text { font-size:16px; font-weight:bold; fill:red; }
+
+  /* Gate valves */
+  .valve{ cursor:pointer; }
+  .gate-blade { fill:none; stroke:#000; stroke-width:3; stroke-linejoin:round; transition: transform .2s ease, stroke .2s ease;
+                transform-box: fill-box; transform-origin:center; }
+  .valve.open .gate-blade { stroke:green; }
+  .valve.open .gate-left  { transform: translateX(-7px); }
+  .valve.open .gate-right { transform: translateX( 7px); }
+  .valve-label { font-size:12px; fill:#222; text-anchor:middle; user-select:none; pointer-events:none; }
+  #v5 { cursor: default; pointer-events:none; }
+
+  /* Subsea + waterline */
+  .subsea { fill:#e6f3ff; opacity:.45; }
+  .waterline { stroke:#357edd; stroke-width:2; stroke-dasharray:8 6; }
+  .waterline-label { font-size:12px; fill:#357edd; }
+
+  /* V5 remote panel */
+  .ctl-panel { fill:#151515; stroke:#444; stroke-width:1.5; rx:4; ry:4; }
+  .ctl-text { fill:#fff; font-size:12px; font-weight:bold; }
+  .light { stroke:#222; stroke-width:1; }
+  .light-on  { fill:#2fd36b; }
+  .light-off { fill:#e34848; }
+  .light-dim { fill:#4a4a4a; }
+  .ctl-btn { fill:transparent; cursor:pointer; }
+  .ctl-wire { stroke:#000; stroke-width:2; fill:none; }
+
+  /* Status & alarms */
+  #status-alarms .stack { display:flex; gap:8px; flex-wrap:wrap; }
+  #alarms-list{ margin:8px 0 0 2px; }
+  #alarms-list li{ margin:4px 0; }
+  .ok { color: var(--good); }
+  .bad{ color: var(--bad); }
+
+  /* Settings subtabs */
+  .subtabs{ display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .subtab{
+    border:1px solid var(--border); border-radius:999px; padding:6px 12px; background:rgba(148,163,184,.08);
+    color:#cbd5e1; font-weight:600; cursor:pointer;
+  }
+  .subtab.active{ border-color: var(--ring); color:#e5edff; background: rgba(37,99,235,.20); }
+  .subpage{ display:none; }
+  .subpage.active{ display:block; }
+
+  /* Lineup view */
+  .lineup-list .lineup-step{ padding:6px 8px; border:1px solid var(--border); border-radius:10px; margin:6px 0; background:rgba(148,163,184,.06); }
+  .lineup-step.done{ border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.08); }
+  .lineup-step.next{ border-color: rgba(59,130,246,.35); background: rgba(59,130,246,.08); }
+  .lineup-hint{ color:#93c5fd; font-size:12px; }
+
+  /* Lineup Editor (trainer) */
+  .le-row{ display:grid; grid-template-columns: 36px 1fr auto; gap:8px; align-items:center; }
+  .le-row + .le-row { border-top:1px dashed rgba(148,163,184,.2); padding-top:6px; margin-top:6px; }
+  .le-type{ color:var(--muted); font-size:12px; }
+  .le-actions .btn{ margin-left:6px; }
+
+  /* Quick Guide */
+  .guide{ background:#fff; color:#111827; border-radius:12px; padding:16px; }
+  .guide h2{ margin:.2rem 0 .6rem; }
+  .guide h3{ margin:1rem 0 .4rem; }
+  .guide table{ width:100%; border-collapse:collapse; font-size:14px; }
+  .guide th, .guide td{ border:1px solid #e5e7eb; padding:6px 8px; text-align:left; }
+  .guide .small{ font-size:12px; color:#6b7280; }
+
+  @media (max-width: 980px){
+    .grid{ grid-template-columns: 1fr; }
+  }
+
+  @media print {
+    .topnav, #page-main, #page-settings, #page-trainer { display:none !important; }
+    #page-guide { display:block !important; }
+    body { background:#fff; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ===== NAV ===== -->
+  <div class="topnav">
+    <div class="topbar">
+      <div class="brand"><div class="logo"></div> FES — Wellhead & Choke</div>
+      <div class="tabs">
+        <button class="tab" data-route="main">Main</button>
+        <button class="tab" data-route="settings">Settings / Training</button>
+        <button class="tab" data-route="trainer">Trainer</button>
+        <button class="tab" data-route="guide">Quick Guide</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MAIN (lean dashboard) ===== -->
+  <section id="page-main" class="page active">
+    <div class="wrap">
+      <div class="grid">
+        <!-- Left column: minimal controls -->
+        <div class="panel">
+          <h3>Controls</h3>
+          <div class="form-grid">
+            <div class="field"><label>Reservoir / Inlet Pressure (psi)</label><input type="number" id="pressure-input" value="10000" step="100"></div>
+            <div class="field"><label>Reservoir Inflow Cap (BPD)</label><input type="number" id="inlet-flow" value="5000" step="100"></div>
+            <div class="field"><label>Choke Size (in)</label><input type="text" id="choke-size" value="1/2"></div>
+            <div class="field"><label>Zoom</label><input type="range" id="zoom" min="0.6" max="2" step="0.05" value="0.9"></div>
+          </div>
+          <div class="help" style="margin-top:6px;">Tip: hold <b>Alt</b> when clicking a valve to simulate “Not Moving”.</div>
+          <div class="actions">
+            <button id="btn-reset-main" class="btn">Reset main inputs</button>
+          </div>
+        </div>
+
+        <!-- Right column: combined status + alarms -->
+        <div id="status-alarms" class="panel">
+          <h3>Status & Alarms</h3>
+          <div id="output-stats" class="stack">
+            <span class="pill">Flow Rate: 0.0 BPD</span>
+            <span class="pill">Downstream Pressure: 0 psi</span>
+            <span class="pill">Choke: 1/2</span>
+          </div>
+          <ul id="alarms-list" class="muted" style="margin:8px 0 0;"></ul>
+        </div>
+
+        <!-- Diagram full-width -->
+        <div class="panel full">
+          <h3>Wellhead & Choke Diagram</h3>
+          <div class="diagram-outer">
+            <div class="diagram-inner" id="diagram-inner">
+              <svg width="1200" height="640" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid meet">
+                <!-- Subsea tint & waterline -->
+                <rect x="0" y="500" width="1200" height="140" class="subsea"></rect>
+                <line x1="10" y1="500" x2="1190" y2="500" class="waterline" />
+                <text x="1170" y="490" text-anchor="end" class="waterline-label">Waterline / Subsea</text>
+
+                <!-- Wellhead cross + lines -->
+                <line id="pipe-master"  class="pipe idle-yellow" x1="120" y1="420" x2="120" y2="300" />
+                <line id="pipe-below-master" class="pipe idle-yellow" x1="120" y1="560" x2="120" y2="420" />
+                <line id="pipe-deeper" class="pipe idle-yellow" x1="120" y1="630" x2="120" y2="600" />
+                <line id="pipe-to-wing" class="pipe idle-yellow" x1="120" y1="300" x2="300" y2="300" />
+                <line id="pipe-to-kill" class="pipe idle-yellow" x1="120" y1="300" x2="50"  y2="300" />
+                <line id="pipe-to-swab" class="pipe idle-yellow" x1="120" y1="300" x2="120" y2="240" />
+                <line id="pipe-swab" class="pipe idle-yellow" x1="120" y1="240" x2="120" y2="170" />
+                <line id="pipe-kill" class="pipe idle-yellow" x1="50"  y1="300" x2="10"  y2="300" />
+                <line id="pipe-wing-out" class="pipe idle-yellow" x1="300" y1="300" x2="460" y2="300" />
+
+                <!-- Upstream pressure readout -->
+                <text id="ps-upstream" x="360" y="285" class="gauge-text" style="fill:#333;">0 psi</text>
+
+                <!-- Diamond choke manifold -->
+                <line id="tri-join"  class="pipe idle-yellow" x1="460" y1="300" x2="520" y2="300" />
+                <line id="tri-adj-1" class="pipe choke-pipe idle-yellow" x1="520" y1="300" x2="600" y2="220" />
+                <line id="tri-adj-2" class="pipe choke-pipe idle-yellow" x1="600" y1="220" x2="600" y2="220" />
+                <line id="tri-top"   class="pipe choke-pipe idle-yellow" x1="600" y1="220" x2="680" y2="300" />
+                <line id="tri-fix-1" class="pipe choke-pipe idle-yellow" x1="520" y1="300" x2="600" y2="380" />
+                <line id="tri-fix-2" class="pipe choke-pipe idle-yellow" x1="600" y1="380" x2="680" y2="300" />
+                <line id="tri-out"   class="pipe choke-pipe idle-yellow" x1="680" y1="300" x2="760" y2="300" />
+
+                <!-- Choke symbols -->
+                <g id="adj-choke" class="choke-symbol idle-yellow" transform="translate(600,220) rotate(45)">
+                  <circle class="ring" r="14"></circle>
+                  <line class="mark" x1="-9" y1="0" x2="9" y2="0"></line>
+                  <path class="mark" d="M9,0 l-5,-3 l0,6 z"></path>
+                  <text class="choke-label" x="0" y="-18" text-anchor="middle">ADJ</text>
+                </g>
+                <g id="fix-choke" class="choke-symbol idle-yellow" transform="translate(600,380) rotate(-45)">
+                  <circle class="ring" r="14"></circle>
+                  <line class="mark" x1="-9" y1="0" x2="9" y2="0"></line>
+                  <line class="mark" x1="0"  y1="-6" x2="0" y2="6"></line>
+                  <text class="choke-label" x="0" y="-18" text-anchor="middle">FIX</text>
+                </g>
+
+                <!-- Downstream gauge -->
+                <circle cx="820" cy="300" r="30" stroke="black" stroke-width="2" fill="white" />
+                <text id="gauge-label" x="820" y="305" text-anchor="middle" class="gauge-text">0 psi</text>
+
+                <!-- Valves -->
+                <g id="v1" class="valve" transform="translate(120,420)">
+                  <polygon class="gate-blade gate-left"  points="-12,-8 0,0 -12,8"></polygon>
+                  <polygon class="gate-blade gate-right" points="12,-8 0,0 12,8"></polygon>
+                </g>
+                <text x="120" y="450" class="valve-label">V1</text>
+
+                <g id="v2" class="valve" transform="translate(300,300)">
+                  <polygon class="gate-blade gate-left"  points="-12,-8 0,0 -12,8"></polygon>
+                  <polygon class="gate-blade gate-right" points="12,-8 0,0 12,8"></polygon>
+                </g>
+                <text x="300" y="280" class="valve-label">V2</text>
+
+                <g id="v3" class="valve" transform="translate(120,240)">
+                  <polygon class="gate-blade gate-left"  points="-12,-8 0,0 -12,8"></polygon>
+                  <polygon class="gate-blade gate-right" points="12,-8 0,0 12,8"></polygon>
+                </g>
+                <text x="120" y="155" class="valve-label">V3</text>
+
+                <g id="v4" class="valve" transform="translate(50,300)">
+                  <polygon class="gate-blade gate-left"  points="-12,-8 0,0 -12,8"></polygon>
+                  <polygon class="gate-blade gate-right" points="12,-8 0,0 12,8"></polygon>
+                </g>
+                <text x="30" y="290" class="valve-label">V4</text>
+
+                <g id="v5" class="valve" transform="translate(120,600)">
+                  <polygon class="gate-blade gate-left"  points="-12,-8 0,0 -12,8"></polygon>
+                  <polygon class="gate-blade gate-right" points="12,-8 0,0 12,8"></polygon>
+                </g>
+                <circle cx="120" cy="600" r="22" stroke="#000" stroke-width="3" fill="none" />
+                <text x="120" y="630" class="valve-label">V5</text>
+
+                <g id="v6" class="valve" transform="translate(560,260) rotate(-45)">
+                  <polygon class="gate-blade gate-left"  points="-10,-8 0,0 -10,8"></polygon>
+                  <polygon class="gate-blade gate-right" points="10,-8 0,0 10,8"></polygon>
+                </g>
+                <text x="560" y="245" class="valve-label">V6</text>
+
+                <g id="v7" class="valve" transform="translate(640,260) rotate(45)">
+                  <polygon class="gate-blade gate-left"  points="-10,-8 0,0 -10,8"></polygon>
+                  <polygon class="gate-blade gate-right" points="10,-8 0,0 10,8"></polygon>
+                </g>
+                <text x="640" y="245" class="valve-label">V7</text>
+
+                <g id="v8" class="valve" transform="translate(560,340) rotate(45)">
+                  <polygon class="gate-blade gate-left"  points="-10,-8 0,0 -10,8"></polygon>
+                  <polygon class="gate-blade gate-right" points="10,-8 0,0 10,8"></polygon>
+                </g>
+                <text x="560" y="375" class="valve-label">V8</text>
+
+                <g id="v9" class="valve" transform="translate(640,340) rotate(-45)">
+                  <polygon class="gate-blade gate-left"  points="-10,-8 0,0 -10,8"></polygon>
+                  <polygon class="gate-blade gate-right" points="10,-8 0,0 10,8"></polygon>
+                </g>
+                <text x="640" y="375" class="valve-label">V9</text>
+
+                <!-- V5 remote control panel -->
+                <g id="v5-panel" transform="translate(920,260)">
+                  <rect x="0" y="0" width="100" height="66" class="ctl-panel"></rect>
+                  <circle id="light-on"  class="light light-dim" cx="12" cy="20" r="6"></circle>
+                  <circle id="light-off" class="light light-off" cx="12" cy="46" r="6"></circle>
+                  <text x="30" y="24" class="ctl-text">ON</text>
+                  <text x="30" y="50" class="ctl-text">OFF</text>
+                  <rect id="btn-on"  class="ctl-btn" x="0"  y="0"  width="100" height="33"></rect>
+                  <rect id="btn-off" class="ctl-btn" x="0"  y="33" width="100" height="33"></rect>
+                </g>
+                <polyline id="ctl-wire" class="ctl-wire" points="1020,293 1020,500 140,500 140,600 120,600"></polyline>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div><!-- /grid -->
+    </div>
+  </section>
+
+  <!-- ===== SETTINGS / TRAINING ===== -->
+  <section id="page-settings" class="page">
+    <div class="wrap">
+      <div class="panel">
+        <div class="subtabs">
+          <button class="subtab active" data-subtab="display">Display</button>
+          <button class="subtab" data-subtab="procedures">Procedures</button>
+          <button class="subtab" data-subtab="training">Training</button>
+          <button class="subtab" data-subtab="dynamics">Dynamics</button>
+          <span class="pill" id="save-indicator" title="Settings are stored locally">Saved ✓</span>
+        </div>
+
+        <!-- DISPLAY -->
+        <div class="subpage active" data-subpage="display">
+          <div class="form-grid">
+            <div class="field"><label>Idle Pipe Color</label>
+              <select id="idle-color"><option value="idle-yellow">Yellow</option><option value="idle-red">Red</option></select>
+            </div>
+            <div class="field"><label>Flow Color</label>
+              <select id="flow-color">
+                <option value="#60a5fa">Blue</option>
+                <option value="#00bcd4">Cyan</option>
+                <option value="#22c55e">Green</option>
+                <option value="#f59e0b">Orange</option>
+                <option value="#d33682">Magenta</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:10px;">
+            <button id="btn-reset-main" class="btn">Reset main inputs</button>
+            <button id="btn-reset-settings" class="btn">Reset V3/V4 settings</button>
+            <button id="btn-reset-all" class="btn primary">Reset ALL</button>
+          </div>
+        </div>
+
+        <!-- PROCEDURES -->
+        <div class="subpage" data-subpage="procedures">
+          <h3>Swab / Kill Settings</h3>
+          <div class="form-grid">
+            <div class="field"><label>Swab Target (BPD)</label><input type="number" id="set-swab-target" value="3000" step="100"></div>
+            <div class="field"><label>Kill Target (psi)</label><input type="number" id="set-kill-target" value="3000" step="100"></div>
+            <div class="field"><label>Kill Min Start (psi)</label><input type="number" id="set-kill-min-start" value="5000" step="100"></div>
+            <div class="field"><label>Ramp Steps</label><input type="number" id="set-ramp-steps" value="10" step="1" min="1"></div>
+            <div class="field"><label>Step Interval (ms)</label><input type="number" id="set-step-ms" value="300" step="50" min="50"></div>
+          </div>
+
+          <div class="panel" style="margin-top:12px;">
+            <h3>Start / Stop Checklists (Live)</h3>
+            <div class="grid" style="grid-template-columns: 1fr 1fr;">
+              <div>
+                <div class="pill" style="margin-bottom:6px;">Start Production Checklist</div>
+                <div id="start-checks" class="muted"></div>
+              </div>
+              <div>
+                <div class="pill" style="margin-bottom:6px;">Stop Production Checklist</div>
+                <div id="stop-checks" class="muted"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRAINING -->
+        <div class="subpage" data-subpage="training">
+          <h3>Training / Conditions</h3>
+          <div class="form-grid">
+            <div class="field"><label>Fluid Temperature (°F)</label><input type="number" id="fluid-temp" value="80" step="1"></div>
+            <div class="field"><label>Emergency Mode</label>
+              <select id="emergency-mode"><option value="off">Off</option><option value="on">On</option></select>
+            </div>
+            <div class="field"><label>Jam a Valve (next command)</label>
+              <select id="jam-valve-id">
+                <option value="">Select…</option>
+                <option>V1</option><option>V2</option><option>V3</option><option>V4</option>
+                <option>V5</option><option>V6</option><option>V7</option><option>V8</option><option>V9</option>
+              </select>
+            </div>
+            <div class="field"><label>SCSSV Fail to Close (next OFF)</label>
+              <select id="sim-v5-fail"><option value="off">Off</option><option value="on">On</option></select>
+            </div>
+          </div>
+          <div class="actions"><button id="btn-arm-jam" class="btn">Arm Jam</button></div>
+        </div>
+
+        <!-- DYNAMICS -->
+        <div class="subpage" data-subpage="dynamics" id="dyn-panel">
+          <h3>Dynamics (Pressure Build-up / Drop)</h3>
+          <div class="form-grid" style="grid-template-columns: repeat(3, minmax(220px,1fr));">
+            <div class="field"><label>Enable dynamics</label>
+              <select id="dyn-enabled"><option value="on">On</option><option value="off">Off</option></select>
+            </div>
+            <div class="field"><label>Reservoir PI (BPD/psi)</label><input id="dyn-PI" type="number" value="30" step="1"></div>
+            <div class="field"><label>Upstream capacity Cu (bbl/psi)</label><input id="dyn-Cu" type="number" value="0.05" step="0.005"></div>
+            <div class="field"><label>Downstream capacity Cd (bbl/psi)</label><input id="dyn-Cd" type="number" value="0.03" step="0.005"></div>
+            <div class="field"><label>Pipeline pressure P<sub>line</sub> (psi)</label><input id="dyn-Pline" type="number" value="1000" step="50"></div>
+            <div class="field"><label>Choke coeff K<sub>choke</sub> (BPD / in² / √psi)</label><input id="dyn-Kchoke" type="number" value="2600" step="50"></div>
+            <div class="field"><label>Line coeff K<sub>line</sub> (BPD / √psi)</label><input id="dyn-Kline" type="number" value="140" step="5"></div>
+            <div class="field"><label>Kill pressure P<sub>kill</sub> (psi)</label><input id="dyn-Pkill" type="number" value="500" step="50"></div>
+            <div class="field"><label>Kill coeff K<sub>kill</sub> (BPD / √psi)</label><input id="dyn-Kkill" type="number" value="160" step="5"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TRAINER ===== -->
+  <section id="page-trainer" class="page">
+    <div class="wrap">
+      <div id="trainer-lock" class="panel" style="display:none;">
+        <h3>Trainer Console — Enter PIN</h3>
+        <div class="form-grid">
+          <div class="field"><label>PIN</label><input id="trainer-pin" type="password" value=""></div>
+        </div>
+        <div class="actions">
+          <button id="trainer-unlock" class="btn primary">Unlock</button>
+          <span id="trainer-lock-msg" class="pill bad" style="display:none;">Wrong PIN</span>
+        </div>
+      </div>
+
+      <div id="trainer-ui" style="display:none;">
+        <div class="grid">
+          <!-- Session / scenario -->
+          <div class="panel">
+            <h3>Session</h3>
+            <div class="form-grid">
+              <div class="field"><label>Student Name</label><input id="student-name" placeholder="e.g., Ada Okon"></div>
+              <div class="field"><label>Student ID</label><input id="student-id" placeholder="e.g., ENG-23-041"></div>
+              <div class="field"><label>Mode</label>
+                <select id="trainer-mode"><option value="practice">Practice (tooltips on)</option><option value="exam">Exam (tooltips off)</option></select>
+              </div>
+              <div class="field"><label>Scenario</label><select id="scenario-select"></select></div>
+            </div>
+            <div class="actions">
+              <button id="btn-start-scn" class="btn primary">Start Scenario</button>
+              <button id="btn-stop-scn" class="btn danger" disabled>Stop Scenario</button>
+              <span id="timer" class="pill">00:00</span>
+              <span id="score-pill" class="pill" style="display:none;"></span>
+            </div>
+            <div class="actions">
+              <button id="btn-export-csv" class="btn">Export CSV</button>
+              <button id="btn-export-json" class="btn">Export JSON</button>
+            </div>
+          </div>
+
+          <!-- Fault injection -->
+          <div class="panel">
+            <h3>Fault Injection (trainer)</h3>
+            <div class="form-grid">
+              <div class="field"><label>Overpressure (+psi/min)</label><input id="fi-overp" type="number" value="600" step="50" min="0"></div>
+              <div class="field"><label>Leak / Pressure loss (−psi/min)</label><input id="fi-leak" type="number" value="600" step="50" min="0"></div>
+              <div class="field"><label>Blockage (% flow drop)</label><input id="fi-block" type="number" value="40" step="5" min="0" max="95"></div>
+              <div class="field"><label>Temp spike (+°F)</label><input id="fi-temp" type="number" value="200" step="10" min="0"></div>
+              <div class="field"><label>Choke erosion (+/min to choke frac)</label><input id="fi-erosion" type="number" value="0.05" step="0.01" min="0" max="1"></div>
+            </div>
+            <div class="actions">
+              <button id="fi-overp-on" class="btn">Inject Overpressure</button>
+              <button id="fi-overp-off" class="btn ghost">Clear</button>
+              <button id="fi-leak-on" class="btn">Inject Leak</button>
+              <button id="fi-leak-off" class="btn ghost">Clear</button>
+              <button id="fi-block-on" class="btn">Inject Blockage</button>
+              <button id="fi-block-off" class="btn ghost">Clear</button>
+              <button id="fi-v2half-on" class="btn">V2 stuck half</button>
+              <button id="fi-v2half-off" class="btn ghost">Clear</button>
+              <button id="fi-freeze-on" class="btn">Freeze sensors</button>
+              <button id="fi-freeze-off" class="btn ghost">Unfreeze</button>
+              <button id="fi-temp-on" class="btn">Temp spike</button>
+              <button id="fi-temp-off" class="btn ghost">Clear</button>
+              <button id="fi-erosion-on" class="btn">Erode choke</button>
+              <button id="fi-erosion-off" class="btn ghost">Clear</button>
+              <button id="fi-clear-all" class="btn danger">Clear ALL Faults</button>
+            </div>
+            <div class="pill" id="fi-active" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">No active faults</div>
+          </div>
+
+          <!-- Lineup enforcement controls -->
+          <div class="panel full">
+            <h3>Lineup Enforcement</h3>
+            <div class="actions">
+              <label class="pill"><input type="checkbox" id="lineup-require" checked style="margin-right:6px;">Require lineup (soft)</label>
+              <label class="pill"><input type="checkbox" id="lineup-hard" style="margin-right:6px;">Hard enforce (block wrong actions)</label>
+              <label class="pill"><input type="checkbox" id="lineup-hints" checked style="margin-right:6px;">Show hints on Guide</label>
+              <button id="lineup-reset" class="btn">Reset Lineup Progress</button>
+            </div>
+            <div class="muted" style="margin-top:8px;">Soft = allow but alarm/log on wrong order. Hard = prevent the action.</div>
+          </div>
+
+          <!-- Lineup Editor -->
+          <div class="panel full">
+            <h3>Lineup Editor (Trainer)</h3>
+            <div id="le-list" style="width:100%;"></div>
+            <div class="panel" style="margin-top:10px;">
+              <h3 id="le-form-title" style="margin:0 0 8px;">Add Step</h3>
+              <div class="form-grid">
+                <div class="field"><label>Type</label>
+                  <select id="le-type">
+                    <option value="valve">Valve</option>
+                    <option value="chokeRange">Choke range</option>
+                    <option value="selectOnePath">Select ONE choke path</option>
+                    <option value="valvesClosed">Valves closed</option>
+                  </select>
+                </div>
+                <div class="field"><label>Label</label><input id="le-label" placeholder="e.g., SCSSV ON (V5)"></div>
+                <div class="field"><label>Hint</label><input id="le-hint" placeholder="Short tip for trainee"></div>
+              </div>
+              <div id="le-type-fields" class="form-grid" style="margin-top:8px;"></div>
+              <div class="actions">
+                <button id="le-save" class="btn primary">Add Step</button>
+                <button id="le-cancel" class="btn ghost" type="button">Clear</button>
+                <button id="le-reset-default" class="btn" type="button">Reset to default lineup</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel full">
+            <h3>Objectives</h3>
+            <div id="objectives-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== QUICK GUIDE (now also shows LIVE lineup) ===== -->
+  <section id="page-guide" class="page">
+    <div class="wrap">
+      <div class="panel">
+        <div class="guide">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>FES Quick Guide — Wellhead & Valve Guideline</h2>
+            <button class="btn primary" onclick="window.print()">Print Quick Guide</button>
+          </div>
+
+          <h3>Production Lineup (Startup Steps)</h3>
+          <ol>
+            <li><b>SCSSV ON (V5)</b> — enable from surface panel.</li>
+            <li><b>Open Master (V1)</b> slowly.</li>
+            <li><b>Set a small choke opening</b> (0.20–0.35 in).</li>
+            <li><b>Select ONE choke path</b> — Adjustable (<b>V6+V7</b>) <i>or</i> Fixed (<b>V8+V9</b>) — not both.</li>
+            <li><b>Crack Flow Wing (V2)</b> to send flow to the line.</li>
+            <li><b>Confirm V3 (Swab) & V4 (Kill)</b> remain <b>CLOSED</b> during production.</li>
+          </ol>
+
+          <h3>Live Lineup Status</h3>
+          <div id="lineup-steps" class="lineup-list"></div>
+
+          <h3>Valves</h3>
+          <table>
+            <thead><tr><th>Valve</th><th>Name</th><th>Function</th></tr></thead>
+            <tbody>
+              <tr><td><b>V1</b></td><td>Master Valve</td><td>Main ON/OFF valve to surface.</td></tr>
+              <tr><td><b>V2</b></td><td>Flow Wing Valve</td><td>Routes to production line.</td></tr>
+              <tr><td><b>V3</b></td><td>Swab Valve</td><td>Maintenance access; closed in production.</td></tr>
+              <tr><td><b>V4</b></td><td>Kill Wing Valve</td><td>Emergency pump-in; normally closed.</td></tr>
+              <tr><td><b>V5</b></td><td>SCSSV</td><td>Safety shut-off (surface controlled).</td></tr>
+              <tr><td><b>V6–V9</b></td><td>Chokes</td><td>Adjustable & fixed restrictions.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Start / Stop Procedures, Limits & Alarms</h3>
+          <ul>
+            <li><b>Pressure:</b> 1,000–15,000 psi; <b>Flow:</b> ~10,000 BPD nominal; alarms: &gt;12,000 or &lt;1,000 BPD; <b>Temp:</b> &gt;250°F.</li>
+            <li>Combos to avoid: V4 open while V1 closed; V3 open during production.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<!-- ===== SCRIPTS (behavior preserved, leaner dashboard) ===== -->
+<script>
+/* ===== Routing ===== */
+const pages={ main:document.getElementById('page-main'), settings:document.getElementById('page-settings'), trainer:document.getElementById('page-trainer'), guide:document.getElementById('page-guide') };
+const tabs=[...document.querySelectorAll('.tab')];
+function goto(route){
+  Object.values(pages).forEach(p=>p.classList.remove('active'));
+  tabs.forEach(t=>t.classList.remove('active'));
+  (pages[route]||pages.main).classList.add('active');
+  (tabs.find(t=>t.dataset.route===route)||tabs[0]).classList.add('active');
+  location.hash = route==='main'?'':'#'+route;
+}
+tabs.forEach(t=>t.addEventListener('click',()=>goto(t.dataset.route)));
+window.addEventListener('hashchange',()=>goto((location.hash||'#main').replace('#','')));
+goto((location.hash||'#main').replace('#',''));
+
+/* Settings subtabs */
+const subButtons=[...document.querySelectorAll('#page-settings .subtab')];
+const subpages=[...document.querySelectorAll('#page-settings .subpage')];
+function gotoSub(name){
+  subButtons.forEach(b=>b.classList.toggle('active', b.dataset.subtab===name));
+  subpages.forEach(p=>p.classList.toggle('active', p.dataset.subpage===name));
+}
+subButtons.forEach(b=>b.addEventListener('click',()=>gotoSub(b.dataset.subtab)));
+gotoSub('display');
+
+/* ===== Constants & persistence ===== */
+const SETTINGS_KEY='swabKillSettings', MAIN_INPUTS_KEY='mainInputs', TRAINING_KEY='trainingInputs', TRAINER_UNLOCKED='trainerUnlocked';
+const TRAINER_LINEUP_CFG_KEY='trainerLineupCfg';
+const TRAINER_LINEUP_STEPS_KEY='trainerLineupSteps';
+const DYN_KEY='dynSettings';
+const DEFAULT_SETTINGS={ swabTarget:3000, killTarget:3000, killMinStart:5000, rampSteps:10, stepMs:300 };
+const DEFAULT_MAIN_INPUTS={ pressure:10000, inletFlow:5000, chokeSize:'1/2', idleColor:'idle-yellow', flowColor:'#60a5fa', zoom:0.9 };
+const DEFAULT_TRAIN={ fluidTemp:80, emergency:'off', jamValve:'', v5Fail:'off' };
+const defaultLineupCfg = { require:true, hard:false, hints:true };
+const DEFAULT_LINEUP_STEPS = [
+  { id:'s1', type:'valve', valve:'v5', mustBeOpen:true,  label:'SCSSV ON (V5)', hint:'Use panel ON' },
+  { id:'s2', type:'valve', valve:'v1', mustBeOpen:true,  label:'Open Master (V1)', hint:'Open slowly' },
+  { id:'s3', type:'chokeRange', min:0.20, max:0.35,     label:'Small choke opening (0.20–0.35 in)', hint:'Set 1/4–1/3 in' },
+  { id:'s4', type:'selectOnePath',                        label:'Select ONE choke path (V6+V7 or V8+V9)', hint:'Not both' },
+  { id:'s5', type:'valve', valve:'v2', mustBeOpen:true,  label:'Crack Flow Wing (V2)', hint:'Send flow to line' },
+  { id:'s6', type:'valvesClosed', valves:['v3','v4'],    label:'Ensure Swab (V3) & Kill (V4) CLOSED', hint:'Keep closed in production' }
+];
+const DEFAULT_DYN={ enabled:'on', PI:30, Cu:0.05, Cd:0.03, Pline:1000, Kchoke:2600, Kline:140, Pkill:500, Kkill:160 };
+
+const P_MIN=1000, P_MAX=15000, FLOW_LOW=1000, FLOW_HIGH=12000, TEMP_HIGH=250;
+function nOr(n,d){ const v=Number(n); return Number.isFinite(v)?v:d; }
+function save(k,o){ localStorage.setItem(k, JSON.stringify(o)); }
+function load(k,def){ try{const r=localStorage.getItem(k); return r?Object.assign({},def,JSON.parse(r)):{...def}; }catch{ return {...def}; } }
+function loadArr(k,def){ try{const r=localStorage.getItem(k); return r?JSON.parse(r):JSON.parse(JSON.stringify(def)); }catch{ return JSON.parse(JSON.stringify(def)); } }
+function setVal(id,v){ const el=document.getElementById(id); if(el) el.value=v; }
+function getVal(id){ const el=document.getElementById(id); return el?el.value:''; }
+function getNum(id){ return nOr(getVal(id),0); }
+
+/* ===== Diagram state ===== */
+const valves={}; ['v1','v2','v3','v4','v5','v6','v7','v8','v9'].forEach(id=>valves[id]=document.getElementById(id));
+const isOpen=id=>valves[id].classList.contains('open');
+const pipeIds=['pipe-master','pipe-below-master','pipe-deeper','pipe-to-wing','pipe-to-kill','pipe-to-swab','pipe-swab','pipe-kill','pipe-wing-out','tri-join','tri-adj-1','tri-adj-2','tri-top','tri-fix-1','tri-fix-2','tri-out'];
+const pipes=pipeIds.map(id=>document.getElementById(id));
+
+/* ===== Event log ===== */
+const events=[];
+function logEv(type, data={}){ events.push({ t: Date.now(), type, ...data }); }
+
+/* ===== Tooltips toggle ===== */
+function setTooltips(enabled){
+  const ids=['v1','v2','v3','v4','v5','v6','v7','v8','v9','adj-choke','fix-choke','v5-panel'];
+  ids.forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    const existing=[...el.childNodes].find(n=>n.nodeName==='TITLE');
+    if(enabled){ if(!existing){ const t=document.createElementNS('http://www.w3.org/2000/svg','title'); t.textContent=id; el.insertBefore(t, el.firstChild);} }
+    else{ if(existing) el.removeChild(existing); }
+  });
+}
+
+/* ===== Pipes/helpers ===== */
+function parseFraction(s){ if(!s) return 1; s=String(s).trim(); let v=s.includes('/')?(Number(s.split('/')[0])/Number(s.split('/')[1])):parseFloat(s); return isFinite(v)?Math.max(0,Math.min(1,v)):1; }
+function setPipeState(id, flowing){
+  const el=document.getElementById(id); if(!el) return;
+  const idleClass=getVal('idle-color')||'idle-yellow';
+  el.classList.remove('flowing','idle-yellow','idle-red');
+  el.classList.add(flowing?'flowing':idleClass);
+}
+function setSymbolState(id, flowing){
+  const el=document.getElementById(id); if(!el) return;
+  const idleClass=getVal('idle-color')||'idle-yellow';
+  el.classList.remove('flowing-static','idle-yellow','idle-red');
+  el.classList.add(flowing?'flowing-static':idleClass);
+}
+function repaintIdlePipes(){
+  const idleClass=getVal('idle-color')||'idle-yellow';
+  pipes.forEach(el=>{ if(el && !el.classList.contains('flowing')){ el.classList.remove('idle-yellow','idle-red'); el.classList.add(idleClass); }});
+  updateFlow();
+}
+
+/* ===== Lineup ===== */
+function loadLineupCfg(){ return load(TRAINER_LINEUP_CFG_KEY, defaultLineupCfg); }
+function saveLineupCfg(o){ save(TRAINER_LINEUP_CFG_KEY, o); }
+function loadLineupSteps(){ return loadArr(TRAINER_LINEUP_STEPS_KEY, DEFAULT_LINEUP_STEPS); }
+function saveLineupSteps(steps){ localStorage.setItem(TRAINER_LINEUP_STEPS_KEY, JSON.stringify(steps)); }
+
+function describeStep(s){
+  if (s.label && s.label.trim()) return s.label;
+  switch(s.type){
+    case 'valve': return `${(s.mustBeOpen?'Open':'Close').toUpperCase()} ${s.valve?.toUpperCase()}`;
+    case 'chokeRange': return `Choke ${s.min}–${s.max} in`;
+    case 'selectOnePath': return `Select ONE choke path (Adj or Fixed)`;
+    case 'valvesClosed': return `Ensure closed: ${(s.valves||[]).map(v=>v.toUpperCase()).join(', ')}`;
+    default: return 'Step';
+  }
+}
+function checkStep(s){
+  switch(s.type){
+    case 'valve': return isOpen(s.valve)===!!s.mustBeOpen;
+    case 'chokeRange': { const v=parseFraction(getVal('choke-size')); return v>=Number(s.min) && v<=Number(s.max); }
+    case 'selectOnePath': { const adj=(isOpen('v6')&&isOpen('v7')); const fix=(isOpen('v8')&&isOpen('v9')); return (adj ^ fix); }
+    case 'valvesClosed': return (s.valves||[]).every(v=>!isOpen(v));
+    default: return false;
+  }
+}
+function lineupState(){
+  const steps = loadLineupSteps();
+  const status = steps.map(st => ({ ok: checkStep(st), label: describeStep(st), hint: st.hint||'' }));
+  let nextIdx = status.findIndex(s=>!s.ok);
+  if (nextIdx<0) nextIdx = null;
+  return { steps, status, nextIdx, complete: nextIdx===null };
+}
+function renderLineup(){
+  const wrap = document.getElementById('lineup-steps');
+  if(!wrap) return; // lineup now lives on Guide page only
+  const cfg = loadLineupCfg();
+  const { status, nextIdx, complete } = lineupState();
+  wrap.innerHTML='';
+  status.forEach((s,i)=>{
+    const div = document.createElement('div');
+    div.className = 'lineup-step' + (s.ok ? ' done' : (i===nextIdx ? ' next' : ''));
+    div.innerHTML = (s.ok ? '✓ ' : '• ') + s.label + (cfg.hints && !s.ok && s.hint ? `<span class="lineup-hint"> — ${s.hint}</span>` : '');
+    wrap.appendChild(div);
+  });
+  if (complete){
+    const badge = document.createElement('span');
+    badge.className = 'pill good'; badge.style.marginLeft='8px'; badge.textContent = 'Lineup complete';
+    wrap.appendChild(badge);
+  }
+}
+
+/* ===== Fault model ===== */
+const faults={
+  overp:{active:false, ratePerMin:0}, leak:{active:false, ratePerMin:0}, block:{active:false, pct:0},
+  v2half:{active:false}, freeze:{active:false}, tspike:{active:false, addF:0},
+  erosion:{active:false, perMin:0}, state:{ dP:0, dChoke:0, last:Date.now() }
+};
+function clearAllFaults(){
+  faults.overp.active=faults.leak.active=faults.block.active=faults.v2half.active=faults.freeze.active=faults.tspike.active=faults.erosion.active=false;
+  faults.overp.ratePerMin=faults.leak.ratePerMin=0; faults.block.pct=0; faults.tspike.addF=0; faults.erosion.perMin=0;
+  faults.state.dP=0; faults.state.dChoke=0; renderActiveFaults(); logEv('faultsClear',{});
+}
+function renderActiveFaults(){
+  const box=document.getElementById('fi-active'); if(!box) return;
+  box.innerHTML='';
+  const pills=[];
+  if(faults.overp.active) pills.push(`Overpressure +${faults.overp.ratePerMin} psi/min`);
+  if(faults.leak.active) pills.push(`Leak −${faults.leak.ratePerMin} psi/min`);
+  if(faults.block.active) pills.push(`Blockage ${faults.block.pct}%`);
+  if(faults.v2half.active) pills.push('V2 stuck half');
+  if(faults.freeze.active) pills.push('Sensor freeze');
+  if(faults.tspike.active) pills.push(`Temp +${faults.tspike.addF}°F`);
+  if(faults.erosion.active) pills.push(`Choke erosion +${faults.erosion.perMin}/min`);
+  if(pills.length===0){ box.innerHTML='<span class="pill">No active faults</span>'; return; }
+  pills.forEach(t=>{ const s=document.createElement('span'); s.className='pill bad'; s.textContent=t; box.appendChild(s); });
+}
+function faultTick(){
+  const now=Date.now(); const dt=(now - faults.state.last)/1000; faults.state.last=now;
+  if(faults.overp.active) faults.state.dP += (faults.overp.ratePerMin/60)*dt;
+  if(faults.leak.active)  faults.state.dP -= (faults.leak.ratePerMin/60)*dt;
+  if(faults.erosion.active) faults.state.dChoke += (faults.erosion.perMin/60)*dt;
+}
+
+/* ===== Hydraulics (legacy static path) ===== */
+let pressureInterval=null, flowInterval=null;
+function effectiveV5Open(){ return isOpen('v5'); }
+
+function updateFlow(){
+  setPipeState('pipe-deeper',       effectiveV5Open());
+  setPipeState('pipe-below-master', effectiveV5Open());
+  setPipeState('pipe-master',       effectiveV5Open() && isOpen('v1'));
+
+  const upstreamToWing = effectiveV5Open() && isOpen('v1') && isOpen('v2');
+  setPipeState('pipe-to-wing', upstreamToWing);
+  setPipeState('pipe-wing-out', upstreamToWing);
+
+  setPipeState('pipe-to-kill', isOpen('v4'));
+  setPipeState('pipe-kill',    isOpen('v4'));
+  setPipeState('pipe-to-swab', isOpen('v3'));
+  setPipeState('pipe-swab',    isOpen('v3'));
+
+  setPipeState('tri-join', upstreamToWing);
+
+  const adjPath = upstreamToWing && isOpen('v6') && isOpen('v7') && !(isOpen('v8') && isOpen('v9'));
+  setPipeState('tri-adj-1', upstreamToWing && isOpen('v6'));
+  setPipeState('tri-adj-2', upstreamToWing && isOpen('v6') && isOpen('v7'));
+  setPipeState('tri-top',   adjPath);
+
+  const fixPath = upstreamToWing && isOpen('v8') && isOpen('v9') && !(isOpen('v6') && isOpen('v7'));
+  setPipeState('tri-fix-1', upstreamToWing && isOpen('v8'));
+  setPipeState('tri-fix-2', upstreamToWing && isOpen('v8') && isOpen('v9'));
+
+  setSymbolState('adj-choke', adjPath);
+  setSymbolState('fix-choke', fixPath);
+
+  setPipeState('tri-out',   adjPath || fixPath);
+
+  if (!(adjPath || fixPath)) document.getElementById('gauge-label').textContent = '0 psi';
+
+  updateDisplay();
+  renderLineup();
+}
+
+let _frozen = { flow: null, pUp: null, pDown: null };
+
+function computeHydraulics(){
+  let inletP=getNum('pressure-input'); let inletF=getNum('inlet-flow'); let choke=parseFraction(getVal('choke-size'));
+  faultTick();
+  inletP = Math.max(0, inletP + faults.state.dP);
+  choke  = Math.max(0, Math.min(1, choke + faults.state.dChoke));
+
+  const upstreamToWing = effectiveV5Open() && isOpen('v1') && isOpen('v2');
+  const adjOpen = upstreamToWing && isOpen('v6') && isOpen('v7') && !(isOpen('v8') && isOpen('v9'));
+  const fixOpen = upstreamToWing && isOpen('v8') && isOpen('v9') && !(isOpen('v6') && isOpen('v7'));
+  const anyChoke = adjOpen || fixOpen;
+
+  let flow=inletF, outP=inletP;
+  if (anyChoke){ flow *= choke; outP *= choke; }
+  else if (!upstreamToWing){ flow=0; outP=0; }
+
+  if (faults.block.active){ flow *= Math.max(0, 1 - faults.block.pct/100); }
+  if (faults.v2half.active && upstreamToWing){ flow = Math.min(flow, inletF*0.5); }
+
+  const tempF = getNum('fluid-temp') + (faults.tspike.active ? faults.tspike.addF : 0);
+  const p_upstream = inletP;
+  return { inletP, inletF, choke, upstreamToWing, adjOpen, fixOpen, anyChoke, flow, outP, p_upstream, tempF };
+}
+
+/* ===== DYNAMICS ===== */
+const phys = { Pu: 0, Pd: 0, dPu: 0, dPd: 0, last: Date.now() };
+let physTimer = null;
+
+function loadDyn(){ return load(DYN_KEY, DEFAULT_DYN); }
+function saveDyn(o){ save(DYN_KEY, o); }
+function dynEnabled(){ return loadDyn().enabled === 'on'; }
+
+function instantFlows(Pu, Pd){
+  const dyn=loadDyn();
+  const PresEff = Math.max(0, getNum('pressure-input') + faults.state.dP);
+  const v2Open = isOpen('v2');
+  const adjOpen = v2Open && isOpen('v6') && isOpen('v7') && !(isOpen('v8') && isOpen('v9'));
+  const fixOpen = v2Open && isOpen('v8') && isOpen('v9') && !(isOpen('v6') && isOpen('v7'));
+  const anyChoke = adjOpen || fixOpen;
+
+  let d = parseFraction(getVal('choke-size'));
+  d = Math.max(0, Math.min(1, d + faults.state.dChoke)); // erosion effect
+  let kCh = dyn.Kchoke * (d*d);
+
+  let Qres  = (isOpen('v1') && isOpen('v5')) ? Math.max(dyn.PI * Math.max(PresEff - Pu, 0), 0) : 0; // BPD
+  let Qud   = anyChoke ? Math.max(kCh * Math.sqrt(Math.max(Pu - Pd, 0)), 0) : 0;                  // BPD
+  let Qout  = Math.max(dyn.Kline * Math.sqrt(Math.max(Pd - dyn.Pline, 0)), 0);                    // BPD
+  const Qkill = isOpen('v4') ? Math.max(dyn.Kkill * Math.sqrt(Math.max(Pu - dyn.Pkill, 0)), 0) : 0;
+
+  if (faults.block.active) Qud *= Math.max(0, 1 - faults.block.pct/100);
+  if (faults.v2half.active && v2Open) Qud *= 0.5;
+
+  return { Qres, Qud, Qout, Qkill, anyChoke, adjOpen, fixOpen };
+}
+
+function physicsKick(){ phys.last=Date.now(); }
+
+function physicsStep(){
+  if (!dynEnabled()) return;
+  const now = Date.now();
+  const dt = Math.min(0.25, (now - phys.last)/1000);
+  phys.last = now;
+
+  faultTick();
+
+  const dyn=loadDyn();
+  if (phys.Pd <= 0) phys.Pd = dyn.Pline;
+
+  const { Qres, Qud, Qout, Qkill } = instantFlows(phys.Pu, phys.Pd);
+  const bpd2s = 1/86400;
+  const Qin_u  = (Qres) * bpd2s;
+  const Qout_u = (Qud + Qkill) * bpd2s;
+  const Qin_d  = (Qud) * bpd2s;
+  const Qout_d = (Qout) * bpd2s;
+
+  const Cu = Math.max(1e-4, loadDyn().Cu);
+  const Cd = Math.max(1e-4, loadDyn().Cd);
+  const dPu = (Qin_u - Qout_u) / Cu;
+  const dPd = (Qin_d - Qout_d) / Cd;
+
+  phys.Pu = Math.max(0, phys.Pu + dPu * dt);
+  phys.Pd = Math.max(0, phys.Pd + dPd * dt);
+  phys.dPu = dPu; phys.dPd = dPd;
+
+  computeInstantAndDisplay();
+}
+
+function computeInstantAndDisplay(){
+  const flows = instantFlows(phys.Pu, phys.Pd);
+  let flowReal = flows.Qud;
+  let pUp = Math.round(phys.Pu), pDown = Math.round(phys.Pd), fDisp = flowReal;
+
+  if (faults.freeze.active){
+    if (_frozen.flow===null){ _frozen = { flow:flowReal, pUp, pDown }; }
+    pUp=_frozen.pUp; pDown=_frozen.pDown; fDisp=_frozen.flow;
+  } else { _frozen = { flow:null, pUp:null, pDown:null }; }
+
+  document.getElementById('output-stats').innerHTML =
+    `<span class="pill">Flow Rate: ${fDisp.toFixed(1)} BPD</span><span class="pill">Downstream Pressure: ${pDown} psi</span><span class="pill">Choke: ${getVal('choke-size')}</span>`;
+  document.getElementById('gauge-label').textContent = `${pDown} psi`;
+  document.getElementById('ps-upstream').textContent = `${pUp} psi`;
+
+  updateAlarmsDynamic(flows, fDisp, pUp, pDown);
+  updateTrainingChecksDynamic(flows, fDisp);
+  renderLineup();
+  return { flows, fDisp };
+}
+
+function startPhysics(){ if(physTimer) return; phys.last=Date.now(); physTimer = setInterval(physicsStep, 100); }
+function stopPhysics(){ if(!physTimer) return; clearInterval(physTimer); physTimer=null; }
+
+/* ===== Alarms ===== */
+const alarms = new Set(); let prevAlarms = new Set();
+function addAlarm(msg){ alarms.add(msg); }
+function clearAlarms(){ alarms.clear(); }
+function renderAlarms(){
+  const list=document.getElementById('alarms-list'); if(!list) return;
+  list.innerHTML='';
+  if(alarms.size===0){ list.innerHTML='<li class="ok">No active alarms.</li>'; return; }
+  [...alarms].forEach(a=>{ const li=document.createElement('li'); li.textContent=a; li.className='bad'; list.appendChild(li); });
+}
+function updateAlarms(H){
+  clearAlarms();
+  const tempF=H.tempF;
+
+  if (H.p_upstream > P_MAX) addAlarm(`Pressure HIGH upstream (> ${P_MAX} psi)`);
+  if (H.p_upstream < P_MIN) addAlarm(`Pressure LOW upstream (< ${P_MIN} psi)`);
+  if (H.flow > FLOW_HIGH)   addAlarm(`Flow HIGH (> ${FLOW_HIGH} BPD)`);
+  if (H.anyChoke && H.flow < FLOW_LOW) addAlarm(`Flow LOW (< ${FLOW_LOW} BPD)`);
+  if (tempF > TEMP_HIGH) addAlarm(`Temperature HOT (> ${TEMP_HIGH} °F)`);
+  if (isOpen('v4') && !isOpen('v1')) addAlarm(`Wrong combo: V4 OPEN while V1 CLOSED`);
+  const productionActive = effectiveV5Open() && isOpen('v1') && isOpen('v2') && (H.adjOpen || H.fixOpen);
+  if (isOpen('v3') && productionActive) addAlarm(`Swab open during production`);
+  if (window._scssvFailActive) addAlarm(`SCSSV fail: V5 did not close`);
+
+  [...alarms].forEach(a=>{ if(!prevAlarms.has(a)) logEv('alarmOn',{msg:a}); });
+  [...prevAlarms].forEach(a=>{ if(!alarms.has(a)) logEv('alarmOff',{msg:a}); });
+  prevAlarms = new Set(alarms);
+  renderAlarms();
+}
+function updateAlarmsDynamic(flows, flowUse, pUpUse, pDownUse){
+  const H = {
+    p_upstream: pUpUse,
+    outP: pDownUse,
+    flow: flowUse,
+    anyChoke: flows.anyChoke,
+    adjOpen: flows.adjOpen,
+    fixOpen: flows.fixOpen,
+    tempF: getNum('fluid-temp') + (faults.tspike.active ? faults.tspike.addF : 0)
+  };
+  updateAlarms(H);
+
+  // Rate alarms (psi/s)
+  const rise = 10;
+  if (phys.dPu >  rise) addAlarm(`Rapid pressure RISE upstream (> ${rise} psi/s)`);
+  if (phys.dPu < -rise) addAlarm(`Rapid pressure DROP upstream (< -${rise} psi/s)`);
+  renderAlarms();
+}
+
+/* ===== Checklists ===== */
+function checkMark(done, text){ return `<div><span style="color:${done?'#22c55e':'#93a3b8'}">${done?'✓':'•'}</span> ${text}</div>`; }
+function updateTrainingChecks(H){
+  const smallInitial = parseFraction(getVal('choke-size')) <= 0.3;
+  const targetRate = H.flow >= FLOW_LOW && H.flow <= 10000;
+  const startHTML =
+    checkMark(isOpen('v5'), 'SCSSV (V5) OPEN via panel') +
+    checkMark(isOpen('v1'), 'Master valve (V1) OPENED slowly') +
+    checkMark(smallInitial, 'Small initial choke opening') +
+    checkMark(isOpen('v2'), 'Flow wing (V2) cracked OPEN') +
+    checkMark(targetRate, 'Adjusted choke to target rate (≈1k–10k BPD)');
+  const startBox=document.getElementById('start-checks'); if(startBox) startBox.innerHTML=startHTML;
+
+  const stopHTML =
+    checkMark(H.flow <= FLOW_LOW, 'Choke reduced toward zero flow') +
+    checkMark(!isOpen('v2'), 'Flow wing (V2) CLOSED') +
+    checkMark(!(H.adjOpen||H.fixOpen), 'Choke manifold CLOSED') +
+    checkMark(!isOpen('v1'), 'Master valve (V1) CLOSED slowly') +
+    checkMark(!isOpen('v5'), 'SCSSV (V5) CLOSED / confirmed');
+  const stopBox=document.getElementById('stop-checks'); if(stopBox) stopBox.innerHTML=stopHTML;
+}
+function updateTrainingChecksDynamic(flows, flowUse){
+  const H = { flow: flowUse, adjOpen: flows.adjOpen, fixOpen: flows.fixOpen };
+  updateTrainingChecks(H);
+}
+
+/* ===== Settings IO ===== */
+function populateAll(){
+  const main=load(MAIN_INPUTS_KEY,DEFAULT_MAIN_INPUTS);
+  setVal('pressure-input',main.pressure); setVal('inlet-flow',main.inletFlow); setVal('choke-size',main.chokeSize);
+  setVal('idle-color',main.idleColor); setVal('flow-color',main.flowColor); setVal('zoom',main.zoom);
+  document.documentElement.style.setProperty('--flow-color', main.flowColor);
+  document.getElementById('diagram-inner').style.setProperty('--zoom', main.zoom);
+
+  const set=load(SETTINGS_KEY,DEFAULT_SETTINGS);
+  setVal('set-swab-target',set.swabTarget); setVal('set-kill-target',set.killTarget);
+  setVal('set-kill-min-start',set.killMinStart); setVal('set-ramp-steps',set.rampSteps); setVal('set-step-ms',set.stepMs);
+
+  const tr=load(TRAINING_KEY,DEFAULT_TRAIN);
+  setVal('fluid-temp',tr.fluidTemp); setVal('emergency-mode',tr.emergency);
+  setVal('jam-valve-id',tr.jamValve); setVal('sim-v5-fail',tr.v5Fail);
+}
+function populateDyn(){
+  const d = load(DYN_KEY, DEFAULT_DYN);
+  setVal('dyn-enabled', d.enabled);
+  setVal('dyn-PI', d.PI);
+  setVal('dyn-Cu', d.Cu);
+  setVal('dyn-Cd', d.Cd);
+  setVal('dyn-Pline', d.Pline);
+  setVal('dyn-Kchoke', d.Kchoke);
+  setVal('dyn-Kline', d.Kline);
+  setVal('dyn-Pkill', d.Pkill);
+  setVal('dyn-Kkill', d.Kkill);
+}
+function saveMainInputs(){
+  const o={ pressure:getNum('pressure-input'), inletFlow:getNum('inlet-flow'), chokeSize:getVal('choke-size'),
+            idleColor:getVal('idle-color'), flowColor:getVal('flow-color'), zoom:getNum('zoom') };
+  save(MAIN_INPUTS_KEY,o);
+}
+
+/* ===== V5 panel ===== */
+const btnOn=document.getElementById('btn-on'), btnOff=document.getElementById('btn-off');
+const lightOn=document.getElementById('light-on'), lightOff=document.getElementById('light-off');
+
+function lineupViolationMessage(){
+  const cfg = loadLineupCfg(); if(!cfg.require) return '';
+  const { steps, nextIdx } = lineupState();
+  if (nextIdx===null) return '';
+  const next = steps[nextIdx];
+  return `Lineup: expected ${describeStep(next)}`;
+}
+
+function setSCSSV(open=true){
+  const cfg = loadLineupCfg();
+  const { steps, nextIdx } = lineupState();
+  if (cfg.require && nextIdx!==null){
+    const next=steps[nextIdx];
+    if (!(next.type==='valve' && next.valve==='v5' && next.mustBeOpen===open)){
+      const msg = lineupViolationMessage();
+      if (msg){ addAlarm(msg); renderAlarms(); logEv('lineupStepWrong',{valve:'v5', msg}); }
+      if (cfg.hard) return;
+    }
+  }
+
+  if(!open && getVal('sim-v5-fail')==='on'){ window._scssvFailActive=true; logEv('v5Panel',{cmd:'OFF', result:'fail'}); }
+  else { window._scssvFailActive=false; valves['v5'].classList.toggle('open',open); logEv('v5Panel',{cmd:open?'ON':'OFF', result:'ok'}); }
+  if(isOpen('v5')){ lightOn.classList.add('light-on'); lightOn.classList.remove('light-dim');
+                    lightOff.classList.add('light-dim'); lightOff.classList.remove('light-off'); }
+  else            { lightOn.classList.add('light-dim'); lightOn.classList.remove('light-on');
+                    lightOff.classList.add('light-off'); lightOff.classList.remove('light-dim'); }
+  updateFlow(); physicsKick();
+}
+btnOn?.addEventListener('click',()=>setSCSSV(true));
+btnOff?.addEventListener('click',()=>setSCSSV(false));
+
+/* ===== Valve clicks with jam + lineup enforcement ===== */
+window._jamNext = ''; window._lastValveNotMoving = '';
+document.getElementById('btn-arm-jam').addEventListener('click',()=>{
+  window._jamNext = getVal('jam-valve-id'); const tr=load(TRAINING_KEY,DEFAULT_TRAIN); tr.jamValve=window._jamNext; save(TRAINING_KEY,tr);
+});
+['v1','v2','v3','v4','v6','v7','v8','v9'].forEach(id=>{
+  valves[id].addEventListener('click',(e)=>{
+    window._lastValveNotMoving='';
+    if (window._jamNext===id || e.altKey){
+      window._lastValveNotMoving = id; window._jamNext='';
+      const tr=load(TRAINING_KEY,DEFAULT_TRAIN); tr.jamValve=''; save(TRAINING_KEY,tr);
+      logEv('valveNotMoving',{valve:id});
+      updateFlow(); physicsKick(); return;
+    }
+
+    const before = isOpen(id);
+    const wantOpen = !before;
+
+    const cfg = loadLineupCfg();
+    if (cfg.require){
+      const { steps, nextIdx } = lineupState();
+      if (nextIdx!==null){
+        const next=steps[nextIdx];
+        let violation=false;
+        if (next.type==='valve'){
+          if (!(id===next.valve && next.mustBeOpen===true && wantOpen)) violation=true;
+        } else {
+          violation=true;
+        }
+        if (violation){
+          const msg = lineupViolationMessage();
+          if (msg){ addAlarm(msg); renderAlarms(); logEv('lineupStepWrong',{valve:id, msg}); }
+          if (cfg.hard) return;
+        }
+      }
+    }
+
+    valves[id].classList.toggle('open');
+    logEv('valveToggle',{valve:id, from: before?'open':'closed', to: isOpen(id)?'open':'closed'});
+    updateFlow(); applyV3V4Dynamics(); physicsKick();
+    const st = lineupState();
+    if (st) logEv('lineupStepOK', { after: st.nextIdx===null ? 'complete' : describeStep(st.steps[st.nextIdx]) });
+  });
+});
+
+/* ===== Inputs & display controls ===== */
+['pressure-input','inlet-flow','choke-size'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',()=>{ saveMainInputs(); logEv('inputChange',{id, value:getVal(id)}); updateFlow(); applyV3V4Dynamics(); physicsKick(); });
+});
+document.getElementById('idle-color').addEventListener('change',()=>{ saveMainInputs(); repaintIdlePipes(); });
+document.getElementById('flow-color').addEventListener('change',e=>{ document.documentElement.style.setProperty('--flow-color',e.target.value); saveMainInputs(); });
+document.getElementById('zoom').addEventListener('input',e=>{ const z=parseFloat(e.target.value); document.getElementById('diagram-inner').style.setProperty('--zoom', z); saveMainInputs(); });
+
+document.getElementById('fluid-temp').addEventListener('input',()=>{ const tr=load(TRAINING_KEY,DEFAULT_TRAIN); tr.fluidTemp=getNum('fluid-temp'); save(TRAINING_KEY,tr); logEv('inputChange',{id:'fluid-temp', value:getVal('fluid-temp')}); physicsKick(); });
+document.getElementById('emergency-mode').addEventListener('change',()=>{ const tr=load(TRAINING_KEY,DEFAULT_TRAIN); tr.emergency=getVal('emergency-mode'); save(TRAINING_KEY,tr); logEv('inputChange',{id:'emergency-mode', value:getVal('emergency-mode')}); physicsKick(); });
+document.getElementById('sim-v5-fail').addEventListener('change',()=>{ const tr=load(TRAINING_KEY,DEFAULT_TRAIN); tr.v5Fail=getVal('sim-v5-fail'); save(TRAINING_KEY,tr); logEv('inputChange',{id:'sim-v5-fail', value:getVal('sim-v5-fail')}); physicsKick(); });
+
+['dyn-enabled','dyn-PI','dyn-Cu','dyn-Cd','dyn-Pline','dyn-Kchoke','dyn-Kline','dyn-Pkill','dyn-Kkill'].forEach(id=>{
+  const el=document.getElementById(id); if(!el) return;
+  el.addEventListener('change', ()=>{ saveDyn({
+    enabled:getVal('dyn-enabled'), PI:parseFloat(getVal('dyn-PI'))||DEFAULT_DYN.PI, Cu:parseFloat(getVal('dyn-Cu'))||DEFAULT_DYN.Cu,
+    Cd:parseFloat(getVal('dyn-Cd'))||DEFAULT_DYN.Cd, Pline:parseFloat(getVal('dyn-Pline'))||DEFAULT_DYN.Pline,
+    Kchoke:parseFloat(getVal('dyn-Kchoke'))||DEFAULT_DYN.Kchoke, Kline:parseFloat(getVal('dyn-Kline'))||DEFAULT_DYN.Kline,
+    Pkill:parseFloat(getVal('dyn-Pkill'))||DEFAULT_DYN.Pkill, Kkill:parseFloat(getVal('dyn-Kkill'))||DEFAULT_DYN.Kkill
+  }); physicsKick(); });
+});
+
+/* ===== V3/V4 dynamics (ramps) ===== */
+function readSettingsFromFields(){
+  return { swabTarget:getNum('set-swab-target'), killTarget:getNum('set-kill-target'), killMinStart:getNum('set-kill-min-start'),
+           rampSteps:Math.max(1,Math.round(getNum('set-ramp-steps'))), stepMs:Math.max(50,Math.round(getNum('set-step-ms'))) };
+}
+function applyV3V4Dynamics(){
+  const { swabTarget, killTarget, killMinStart, rampSteps, stepMs } = readSettingsFromFields();
+  const v1Open=isOpen('v1');
+  if (pressureInterval){ clearInterval(pressureInterval); pressureInterval=null; }
+  if (flowInterval){ clearInterval(flowInterval); flowInterval=null; }
+
+  if (v1Open && isOpen('v4')){
+    let p=getNum('pressure-input');
+    if (p>killMinStart){
+      const step=(p-killTarget)/rampSteps; let c=0;
+      pressureInterval=setInterval(()=>{ p-=step; if(p<killTarget)p=killTarget; setVal('pressure-input',Math.round(p)); saveMainInputs(); physicsKick();
+        if(++c>=rampSteps){clearInterval(pressureInterval);pressureInterval=null;} }, stepMs);
+    }
+  }
+  if (v1Open && isOpen('v3')){
+    let f=0; const step=swabTarget/rampSteps;
+    setVal('inlet-flow',0); saveMainInputs();
+    flowInterval=setInterval(()=>{ f+=step; if(f>swabTarget)f=swabTarget; setVal('inlet-flow',Math.round(f)); saveMainInputs(); physicsKick();
+      if(f>=swabTarget){clearInterval(flowInterval);flowInterval=null;} }, stepMs);
+  }
+}
+
+/* ===== Resets ===== */
+document.getElementById('btn-reset-settings').addEventListener('click',()=>{
+  setVal('set-swab-target',DEFAULT_SETTINGS.swabTarget);
+  setVal('set-kill-target',DEFAULT_SETTINGS.killTarget);
+  setVal('set-kill-min-start',DEFAULT_SETTINGS.killMinStart);
+  setVal('set-ramp-steps',DEFAULT_SETTINGS.rampSteps);
+  setVal('set-step-ms',DEFAULT_SETTINGS.stepMs);
+  save(SETTINGS_KEY,DEFAULT_SETTINGS); physicsKick();
+});
+
+/* Attach to ANY duplicate "Reset main inputs" buttons (Main + Settings) */
+document.querySelectorAll('[id="btn-reset-main"]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    setVal('pressure-input',DEFAULT_MAIN_INPUTS.pressure);
+    setVal('inlet-flow',DEFAULT_MAIN_INPUTS.inletFlow);
+    setVal('choke-size',DEFAULT_MAIN_INPUTS.chokeSize);
+    setVal('idle-color',DEFAULT_MAIN_INPUTS.idleColor);
+    setVal('flow-color',DEFAULT_MAIN_INPUTS.flowColor);
+    setVal('zoom',DEFAULT_MAIN_INPUTS.zoom);
+    document.documentElement.style.setProperty('--flow-color', DEFAULT_MAIN_INPUTS.flowColor);
+    document.getElementById('diagram-inner').style.setProperty('--zoom', DEFAULT_MAIN_INPUTS.zoom);
+    save(MAIN_INPUTS_KEY,DEFAULT_MAIN_INPUTS); repaintIdlePipes(); updateFlow(); physicsKick();
+  });
+});
+
+document.getElementById('btn-reset-all').addEventListener('click',()=>{
+  document.getElementById('btn-reset-settings').click();
+  document.querySelector('[id="btn-reset-main"]').click();
+  const d=DEFAULT_DYN; save(DYN_KEY,d); populateDyn();
+  phys.Pu=0; phys.Pd=d.Pline; phys.dPu=0; phys.dPd=0;
+  setVal('fluid-temp',DEFAULT_TRAIN.fluidTemp); setVal('emergency-mode',DEFAULT_TRAIN.emergency);
+  setVal('jam-valve-id',''); setVal('sim-v5-fail',DEFAULT_TRAIN.v5Fail);
+  save(TRAINING_KEY,DEFAULT_TRAIN); window._jamNext=''; window._scssvFailActive=false; window._lastValveNotMoving='';
+  ['v1','v2','v3','v4','v5','v6','v7','v8','v9'].forEach(id=>valves[id].classList.remove('open'));
+  setSCSSV(false);
+  clearAllFaults();
+  repaintIdlePipes(); updateFlow(); applyV3V4Dynamics(); physicsKick();
+});
+
+/* ===== Trainer lock/unlock ===== */
+const trainerLock = document.getElementById('trainer-lock');
+const trainerUI   = document.getElementById('trainer-ui');
+function refreshTrainerLock(){
+  const unlocked = localStorage.getItem(TRAINER_UNLOCKED)==='1';
+  trainerLock.style.display = unlocked ? 'none' : 'block';
+  trainerUI.style.display   = unlocked ? 'block' : 'none';
+}
+document.getElementById('trainer-unlock').addEventListener('click',()=>{
+  const ok = document.getElementById('trainer-pin').value === '1234';
+  document.getElementById('trainer-lock-msg').style.display = ok ? 'none' : 'inline-block';
+  if(ok){ localStorage.setItem(TRAINER_UNLOCKED,'1'); refreshTrainerLock(); }
+});
+
+/* ===== Scenarios ===== */
+const SCENARIOS=[
+  {
+    id:'start-basic', title:'Start Production (Basic)', timeLimitSec:420,
+    initial:{ valvesOpen:['v5'], pressure:8000, flow:0, choke:'1/4' },
+    objectives:[
+      {id:'v5-open',  type:'state', desc:'Confirm V5 open', target:{v5:true}},
+      {id:'v1-open',  type:'state', desc:'Open V1 (Master) slowly', target:{v1:true}},
+      {id:'small-choke', type:'chokeRange', desc:'Small initial choke (0.2–0.35 in)', min:0.2, max:0.35},
+      {id:'v2-open',  type:'state', desc:'Crack V2 (Flow Wing)', target:{v2:true}},
+      {id:'lineup-hold', type:'lineupHold', desc:'Lineup complete for 10s', holdSec:10},
+      {id:'target-flow', type:'flowHold', desc:'Hold 6–9k BPD for 30s', min:6000, max:9000, holdSec:30}
+    ]
+  },
+  {
+    id:'stop-basic', title:'Stop Production (Basic)', timeLimitSec:300,
+    initial:{ valvesOpen:['v1','v2','v5','v6','v7'], pressure:9000, flow:8000, choke:'1/2' },
+    objectives:[
+      {id:'reduce-flow', type:'flowBelow', desc:'Reduce flow < 1000 BPD', max:1000},
+      {id:'close-v2', type:'state', desc:'Close V2 fully', target:{v2:false}},
+      {id:'close-chokes', type:'chokesClosed', desc:'Close choke manifold (V6/V7 or V8/V9)'},
+      {id:'close-v1', type:'state', desc:'Close V1 slowly', target:{v1:false}},
+      {id:'close-v5', type:'state', desc:'Close V5 on panel', target:{v5:false}}
+    ]
+  },
+  {
+    id:'overpressure', title:'Overpressure Response', timeLimitSec:240,
+    initial:{ valvesOpen:['v1','v2','v5','v8','v9'], pressure:12000, flow:6000, choke:'1/2' },
+    objectives:[
+      {id:'safe-pressure', type:'pressureRange', desc:'Bring upstream pressure to 1000–15000 psi', min:1000, max:15000},
+      {id:'no-wrong-combo', type:'forbidCombo', desc:'Never open V4 while V1 is closed'},
+      {id:'stable-flow', type:'flowHold', desc:'Hold 3–8k BPD for 20s', min:3000, max:8000, holdSec:20}
+    ]
+  },
+  {
+    id:'fault-challenge', title:'Fault Challenge (Trainer-Injected)', timeLimitSec:300,
+    initial:{ valvesOpen:['v1','v2','v5','v8','v9'], pressure:10000, flow:7000, choke:'3/8' },
+    objectives:[
+      {id:'alarms-clear', type:'alarmsClearHold', desc:'Clear all alarms and hold 20s', holdSec:20},
+      {id:'limits-hold', type:'limitsHold', desc:'Keep P 1k–15k & Flow 1k–12k for 20s', holdSec:20}
+    ]
+  }
+];
+
+const scenarioSelect=document.getElementById('scenario-select');
+SCENARIOS.forEach(s=>{ const opt=document.createElement('option'); opt.value=s.id; opt.textContent=s.title; scenarioSelect.appendChild(opt); });
+
+let currentScenario=null, scnStart=0, scnTimer=null, scnHoldCounters={}, scnRunning=false;
+
+function applyInitial(init){
+  ['v1','v2','v3','v4','v5','v6','v7','v8','v9'].forEach(id=>{ valves[id].classList.remove('open'); });
+  (init.valvesOpen||[]).forEach(id=>{ const v = id.toLowerCase(); if(valves[v]) valves[v].classList.add('open'); });
+  if(typeof init.pressure==='number') setVal('pressure-input', init.pressure);
+  if(typeof init.flow==='number' || typeof init.flow==='string') setVal('inlet-flow', init.flow);
+  if(init.choke) setVal('choke-size', init.choke);
+  clearAllFaults();
+  saveMainInputs(); repaintIdlePipes(); updateFlow(); applyV3V4Dynamics(); physicsKick();
+}
+function msToClock(ms){ ms=Math.max(0,ms); const s=Math.floor(ms/1000); const m=Math.floor(s/60); const ss=(s%60).toString().padStart(2,'0'); return `${m}:${ss}`; }
+function renderObjectives(){
+  const box=document.getElementById('objectives-list'); if(!box) return;
+  box.innerHTML='';
+  if(!currentScenario){ box.textContent='No scenario running.'; return; }
+  currentScenario.objectives.forEach(o=>{
+    const d=document.createElement('div'); d.style.margin='2px 0';
+    const ok=o.done===true; d.innerHTML=`<span style="color:${ok?'#22c55e':'#93a3b8'}">${ok?'✓':'•'}</span> ${o.desc}`;
+    box.appendChild(d);
+  });
+}
+function evalObjectives(){
+  if(!currentScenario) return;
+
+  let flowNow, adjOpen, fixOpen, pUp;
+  if (dynEnabled()){
+    const flows = instantFlows(phys.Pu, phys.Pd);
+    flowNow = flows.Qud; adjOpen=flows.adjOpen; fixOpen=flows.fixOpen; pUp=phys.Pu;
+  } else {
+    const H=computeHydraulics(); flowNow=H.flow; adjOpen=H.adjOpen; fixOpen=H.fixOpen; pUp=H.p_upstream;
+  }
+
+  currentScenario.objectives.forEach(o=>{
+    if(o.done) return;
+    switch(o.type){
+      case 'state': { const key=Object.keys(o.target)[0]; const want=o.target[key]; o.done = (isOpen(key)===want); break; }
+      case 'chokeRange': { const val=parseFraction(getVal('choke-size')); o.done = (val>=o.min && val<=o.max); break; }
+      case 'flowBelow': { o.done = (flowNow < o.max); break; }
+      case 'chokesClosed': { o.done = !(isOpen('v6')&&isOpen('v7')) && !(isOpen('v8')&&isOpen('v9')); break; }
+      case 'pressureRange': { o.done = (pUp>=o.min && pUp<=o.max); break; }
+      case 'forbidCombo': { o.done = !events.some(e=> e.type==='alarmOn' && /Wrong combo/.test(e.msg)); break; }
+      case 'flowHold': {
+        const inRange = (flowNow>=o.min && flowNow<=o.max);
+        scnHoldCounters[o.id] = scnHoldCounters[o.id] || {acc:0, last:Date.now()};
+        const st=scnHoldCounters[o.id], now=Date.now();
+        if(inRange){ st.acc += (now - st.last); }
+        st.last = now; o.done = (st.acc >= (o.holdSec*1000)); break;
+      }
+      case 'alarmsClearHold': {
+        const none = (document.getElementById('alarms-list') && document.getElementById('alarms-list').textContent.includes('No active alarms'));
+        scnHoldCounters[o.id] = scnHoldCounters[o.id] || {acc:0, last:Date.now()};
+        const st=scnHoldCounters[o.id], now=Date.now();
+        if(none){ st.acc += (now - st.last); } else { st.acc = 0; }
+        st.last = now; o.done = (st.acc >= (o.holdSec*1000)); break;
+      }
+      case 'limitsHold': {
+        const ok = (pUp>=P_MIN && pUp<=P_MAX && flowNow>=FLOW_LOW && flowNow<=FLOW_HIGH);
+        scnHoldCounters[o.id] = scnHoldCounters[o.id] || {acc:0, last:Date.now()};
+        const st=scnHoldCounters[o.id], now=Date.now();
+        if(ok){ st.acc += (now - st.last); } else { st.acc = 0; }
+        st.last = now; o.done = (st.acc >= (o.holdSec*1000)); break;
+      }
+      case 'lineupHold': {
+        const L = lineupState();
+        const ok = L.complete;
+        scnHoldCounters[o.id] = scnHoldCounters[o.id] || {acc:0, last:Date.now()};
+        const st=scnHoldCounters[o.id], now=Date.now();
+        if(ok){ st.acc += (now - st.last); } else { st.acc = 0; }
+        st.last = now; o.done = (st.acc >= (o.holdSec*1000)); break;
+      }
+    }
+  });
+
+  renderObjectives();
+}
+function scoreAttempt(){
+  let score=100;
+  const alarmOn = events.filter(e=>e.type==='alarmOn').length;
+  score -= alarmOn * 3;
+  const ms = Date.now()-scnStart;
+  if(currentScenario){ const over = Math.max(0, ms - currentScenario.timeLimitSec*1000); score -= Math.floor(over/1000/5); }
+  const done = currentScenario? currentScenario.objectives.filter(o=>o.done).length : 0;
+  score += done * 4;
+
+  const wrongLineup = events.filter(e=>e.type==='lineupStepWrong').length;
+  score -= wrongLineup * 5;
+  const lineupOk = events.find(e=>e.type==='lineupStepOK');
+  if (lineupOk) score += 5;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+function startScenario(){
+  if(scnRunning) return;
+  const scn = SCENARIOS.find(s=>s.id===getVal('scenario-select'));
+  currentScenario = JSON.parse(JSON.stringify(scn)); currentScenario.objectives.forEach(o=>o.done=false);
+  scnHoldCounters={}; applyInitial(currentScenario.initial||{});
+  scnStart = Date.now(); scnRunning=true;
+  document.getElementById('btn-start-scn').disabled=true; document.getElementById('btn-stop-scn').disabled=false;
+  events.length=0; prevAlarms = new Set(); logEv('scenarioStart',{id:currentScenario.id, title:currentScenario.title, student:getVal('student-name'), sid:getVal('student-id')});
+  scnTimer = setInterval(()=>{
+    const left = (currentScenario.timeLimitSec*1000) - (Date.now()-scnStart);
+    document.getElementById('timer').textContent = msToClock(left);
+    evalObjectives();
+    if(currentScenario.objectives.every(o=>o.done)){ stopScenario(true); }
+    if(left<=0){ stopScenario(false,true); }
+  }, 500);
+  renderObjectives();
+}
+function stopScenario(passed=false, timeout=false){
+  if(!scnRunning) return;
+  clearInterval(scnTimer); scnTimer=null; scnRunning=false;
+  document.getElementById('btn-start-scn').disabled=false; document.getElementById('btn-stop-scn').disabled=true;
+  const score=scoreAttempt(); const status = timeout ? 'timeout' : (passed ? 'passed' : 'stopped');
+  logEv('scenarioStop',{status, score});
+  const pill=document.getElementById('score-pill'); pill.style.display='inline-block'; pill.textContent=`Score: ${score}/100 (${status})`;
+}
+
+/* ===== Trainer UI wiring ===== */
+function refreshTrainer(){
+  refreshTrainerLock();
+  const modeSel=document.getElementById('trainer-mode');
+  modeSel.addEventListener('change',()=>{ const exam=(modeSel.value==='exam'); setTooltips(!exam); logEv('mode',{mode:modeSel.value}); });
+
+  document.getElementById('btn-start-scn').addEventListener('click', startScenario);
+  document.getElementById('btn-stop-scn').addEventListener('click', ()=>stopScenario(false,false));
+
+  document.getElementById('btn-export-csv').addEventListener('click',()=>exportCSV(events));
+  document.getElementById('btn-export-json').addEventListener('click',()=>exportJSON(events));
+
+  // Fault injection wiring
+  document.getElementById('fi-overp-on').addEventListener('click',()=>{ faults.overp.active=true; faults.overp.ratePerMin=Math.max(0, getNum('fi-overp')); logEv('fault',{name:'overpressure', rate: faults.overp.ratePerMin}); renderActiveFaults(); });
+  document.getElementById('fi-overp-off').addEventListener('click',()=>{ faults.overp.active=false; faults.overp.ratePerMin=0; logEv('faultClear',{name:'overpressure'}); renderActiveFaults(); });
+
+  document.getElementById('fi-leak-on').addEventListener('click',()=>{ faults.leak.active=true; faults.leak.ratePerMin=Math.max(0, getNum('fi-leak')); logEv('fault',{name:'leak', rate:faults.leak.ratePerMin}); renderActiveFaults(); });
+  document.getElementById('fi-leak-off').addEventListener('click',()=>{ faults.leak.active=false; faults.leak.ratePerMin=0; logEv('faultClear',{name:'leak'}); renderActiveFaults(); });
+
+  document.getElementById('fi-block-on').addEventListener('click',()=>{ faults.block.active=true; faults.block.pct=Math.max(0, Math.min(95, getNum('fi-block'))); logEv('fault',{name:'blockage', pct:faults.block.pct}); renderActiveFaults(); });
+  document.getElementById('fi-block-off').addEventListener('click',()=>{ faults.block.active=false; faults.block.pct=0; logEv('faultClear',{name:'blockage'}); renderActiveFaults(); });
+
+  document.getElementById('fi-v2half-on').addEventListener('click',()=>{ faults.v2half.active=true; logEv('fault',{name:'v2half'}); renderActiveFaults(); });
+  document.getElementById('fi-v2half-off').addEventListener('click',()=>{ faults.v2half.active=false; logEv('faultClear',{name:'v2half'}); renderActiveFaults(); });
+
+  document.getElementById('fi-freeze-on').addEventListener('click',()=>{ faults.freeze.active=true; logEv('fault',{name:'freezeOn'}); renderActiveFaults(); });
+  document.getElementById('fi-freeze-off').addEventListener('click',()=>{ faults.freeze.active=false; _frozen={flow:null,pUp:null,pDown:null}; logEv('fault',{name:'freezeOff'}); renderActiveFaults(); });
+
+  document.getElementById('fi-temp-on').addEventListener('click',()=>{ faults.tspike.active=true; faults.tspike.addF=Math.max(0, getNum('fi-temp')); logEv('fault',{name:'tempSpike', addF:faults.tspike.addF}); renderActiveFaults(); });
+  document.getElementById('fi-temp-off').addEventListener('click',()=>{ faults.tspike.active=false; faults.tspike.addF=0; logEv('faultClear',{name:'tempSpike'}); renderActiveFaults(); });
+
+  document.getElementById('fi-erosion-on').addEventListener('click',()=>{ faults.erosion.active=true; faults.erosion.perMin=Math.max(0, parseFloat(getVal('fi-erosion')||'0')); logEv('fault',{name:'chokeErosion', perMin:faults.erosion.perMin}); renderActiveFaults(); });
+  document.getElementById('fi-erosion-off').addEventListener('click',()=>{ faults.erosion.active=false; faults.erosion.perMin=0; logEv('faultClear',{name:'chokeErosion'}); renderActiveFaults(); });
+
+  document.getElementById('fi-clear-all').addEventListener('click', clearAllFaults);
+
+  // Lineup trainer controls
+  (function wireLineupTrainer(){
+    const cfg = loadLineupCfg();
+    const requireEl = document.getElementById('lineup-require');
+    const hardEl    = document.getElementById('lineup-hard');
+    const hintsEl   = document.getElementById('lineup-hints');
+    const resetEl   = document.getElementById('lineup-reset');
+
+    if (requireEl){ requireEl.checked = cfg.require; requireEl.addEventListener('change',()=>{ cfg.require=requireEl.checked; saveLineupCfg(cfg); logEv('trainerLineup',{require:cfg.require}); }); }
+    if (hardEl){ hardEl.checked = cfg.hard; hardEl.addEventListener('change',()=>{ cfg.hard=hardEl.checked; saveLineupCfg(cfg); logEv('trainerLineup',{hard:cfg.hard}); }); }
+    if (hintsEl){ hintsEl.checked = cfg.hints; hintsEl.addEventListener('change',()=>{ cfg.hints=hintsEl.checked; saveLineupCfg(cfg); logEv('trainerLineup',{hints:cfg.hints}); renderLineup(); }); }
+    if (resetEl){ resetEl.addEventListener('click',()=>{
+        ['v3','v4','v2','v6','v7','v8','v9'].forEach(id=>valves[id].classList.remove('open'));
+        ['v5'].forEach(id=>valves[id].classList.add('open'));
+        setVal('choke-size','1/4'); saveMainInputs();
+        repaintIdlePipes(); updateFlow(); renderLineup(); physicsKick();
+        logEv('lineupReset',{});
+    });}
+  })();
+
+  // Lineup Editor wiring
+  wireLineupEditor();
+}
+
+/* ===== Lineup Editor implementation ===== */
+function wireLineupEditor(){
+  const listBox = document.getElementById('le-list');
+  const typeSel = document.getElementById('le-type');
+  const labelIn = document.getElementById('le-label');
+  const hintIn  = document.getElementById('le-hint');
+  const fieldsBox = document.getElementById('le-type-fields');
+  const saveBtn = document.getElementById('le-save');
+  const cancelBtn = document.getElementById('le-cancel');
+  const resetBtn = document.getElementById('le-reset-default');
+  const formTitle = document.getElementById('le-form-title');
+
+  let editIndex = -1;
+
+  function renderTypeFields(type, step){
+    fieldsBox.innerHTML = '';
+    const grp = (html)=>{ const d=document.createElement('div'); d.className='field'; d.innerHTML=html; fieldsBox.appendChild(d); };
+    if (type==='valve'){
+      grp(`<label>Valve</label>
+            <select id="le-valve">
+              <option>V1</option><option>V2</option><option>V3</option><option>V4</option>
+              <option>V5</option><option>V6</option><option>V7</option><option>V8</option><option>V9</option>
+            </select>`);
+      grp(`<label>State</label>
+            <select id="le-must">
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+            </select>`);
+      if(step){ document.getElementById('le-valve').value = (step.valve||'v1').toUpperCase();
+                document.getElementById('le-must').value  = step.mustBeOpen? 'open':'closed'; }
+    } else if (type==='chokeRange'){
+      grp(`<label>Min (in)</label><input id="le-min" type="number" step="0.01" value="${step?.min ?? 0.2}">`);
+      grp(`<label>Max (in)</label><input id="le-max" type="number" step="0.01" value="${step?.max ?? 0.35}">`);
+    } else if (type==='selectOnePath'){
+      grp(`<span class="muted">Requires either V6+V7 or V8+V9 (exclusively).</span>`);
+    } else if (type==='valvesClosed'){
+      const valstr = (step?.valves||['v3','v4']).map(v=>v.toUpperCase()).join(',');
+      grp(`<label>Valves (comma)</label><input id="le-valcsv" placeholder="V3,V4" value="${valstr}">`);
+    }
+  }
+
+  function renderList(){
+    const steps = loadLineupSteps();
+    listBox.innerHTML = '';
+    steps.forEach((s, idx)=>{
+      const row = document.createElement('div');
+      row.className='le-row';
+      row.innerHTML = `
+        <div class="le-idx"><span class="pill">${idx+1}</span></div>
+        <div>
+          <div><b>${describeStep(s)}</b></div>
+          <div class="le-type">${s.type}${s.hint? ' — '+s.hint:''}</div>
+        </div>
+        <div class="le-actions">
+          <button class="btn ghost" data-act="up" data-idx="${idx}">↑</button>
+          <button class="btn ghost" data-act="down" data-idx="${idx}">↓</button>
+          <button class="btn" data-act="edit" data-idx="${idx}">Edit</button>
+          <button class="btn danger" data-act="del" data-idx="${idx}">Delete</button>
+        </div>
+      `;
+      listBox.appendChild(row);
+    });
+
+    listBox.querySelectorAll('button').forEach(b=>{
+      b.addEventListener('click', (e)=>{
+        const act=e.currentTarget.dataset.act;
+        const i=parseInt(e.currentTarget.dataset.idx,10);
+        const steps=loadLineupSteps();
+        if (act==='up' && i>0){ const t=steps[i-1]; steps[i-1]=steps[i]; steps[i]=t; saveLineupSteps(steps); renderList(); logEv('lineupEdit',{op:'moveUp', index:i}); }
+        if (act==='down' && i<steps.length-1){ const t=steps[i+1]; steps[i+1]=steps[i]; steps[i]=t; saveLineupSteps(steps); renderList(); logEv('lineupEdit',{op:'moveDown', index:i}); }
+        if (act==='del'){ steps.splice(i,1); saveLineupSteps(steps); renderList(); logEv('lineupEdit',{op:'delete', index:i}); }
+        if (act==='edit'){ const s=steps[i]; editIndex=i; formTitle.textContent='Edit Step'; typeSel.value=s.type; labelIn.value=s.label||''; hintIn.value=s.hint||''; renderTypeFields(s.type, s);
+          document.getElementById('le-save').textContent='Save Step'; }
+      });
+    });
+  }
+
+  typeSel.addEventListener('change', ()=> renderTypeFields(typeSel.value, null));
+  document.getElementById('le-cancel').addEventListener('click', ()=>{
+    editIndex=-1; formTitle.textContent='Add Step'; labelIn.value=''; hintIn.value=''; typeSel.value='valve'; renderTypeFields('valve',null); document.getElementById('le-save').textContent='Add Step';
+  });
+
+  resetBtn.addEventListener('click', ()=>{ saveLineupSteps(DEFAULT_LINEUP_STEPS); renderList(); document.getElementById('le-cancel').click(); logEv('lineupEdit',{op:'resetDefault'}); });
+
+  document.getElementById('le-save').addEventListener('click', ()=>{
+    const type=typeSel.value;
+    let step = { id: ('s'+Math.random().toString(36).slice(2,7)), type, label: labelIn.value, hint: hintIn.value };
+    if (type==='valve'){
+      const v = (document.getElementById('le-valve').value||'V1').toLowerCase();
+      const must = document.getElementById('le-must').value==='open';
+      step.valve=v; step.mustBeOpen=must;
+      if(!step.label) step.label = `${must?'Open':'Close'} ${v.toUpperCase()}`;
+    } else if (type==='chokeRange'){
+      step.min = parseFloat(document.getElementById('le-min').value||'0.2');
+      step.max = parseFloat(document.getElementById('le-max').value||'0.35');
+      if(!step.label) step.label = `Choke ${step.min}–${step.max} in`;
+    } else if (type==='selectOnePath'){
+      if(!step.label) step.label = 'Select ONE choke path (Adj or Fixed)';
+    } else if (type==='valvesClosed'){
+      const raw = (document.getElementById('le-valcsv').value||'V3,V4').split(',').map(s=>s.trim()).filter(Boolean).map(s=>s.toLowerCase());
+      step.valves = raw;
+      if(!step.label) step.label = `Ensure closed: ${raw.map(v=>v.toUpperCase()).join(', ')}`;
+    }
+
+    const steps = loadLineupSteps();
+    if (editIndex>=0){ steps[editIndex]=step; logEv('lineupEdit',{op:'saveEdit', index:editIndex, step}); }
+    else { steps.push(step); logEv('lineupEdit',{op:'add', step}); }
+    saveLineupSteps(steps); renderList(); document.getElementById('le-cancel').click(); renderLineup();
+  });
+
+  renderTypeFields('valve', null);
+  renderList();
+}
+
+/* ===== Export ===== */
+function exportCSV(evts){
+  const headers=['timeISO','type','data'];
+  const rows=evts.map(e=>[new Date(e.t).toISOString(), e.type, JSON.stringify(e)]);
+  const csv=[headers.join(','), ...rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(','))].join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='fes_attempt.csv'; a.click();
+}
+function exportJSON(evts){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(evts,null,2)],{type:'application/json'})); a.download='fes_attempt.json'; a.click();
+}
+
+/* ===== updateDisplay (routes to dynamics if enabled) ===== */
+function updateDisplay(){
+  if (dynEnabled()){
+    computeInstantAndDisplay(); return;
+  }
+  const H=computeHydraulics();
+  let pUp = Math.round(H.p_upstream), pDown = Math.round(H.outP), fDisp = H.flow;
+  if (faults.freeze.active){
+    if (_frozen.flow===null){ _frozen = { flow:fDisp, pUp, pDown }; }
+    pUp=_frozen.pUp; pDown=_frozen.pDown; fDisp=_frozen.flow;
+  } else { _frozen = { flow:null, pUp:null, pDown:null }; }
+
+  document.getElementById('output-stats').innerHTML =
+    `<span class="pill">Flow Rate: ${fDisp.toFixed(1)} BPD</span><span class="pill">Downstream Pressure: ${pDown} psi</span><span class="pill">Choke: ${getVal('choke-size')}</span>`;
+  document.getElementById('gauge-label').textContent = `${pDown} psi`;
+  document.getElementById('ps-upstream').textContent = `${pUp} psi`;
+  updateAlarms(H);
+  updateTrainingChecks(H);
+  renderLineup();
+}
+
+/* ===== Init ===== */
+(function init(){
+  populateAll(); populateDyn();
+
+  // Start with ALL valves CLOSED & SCSSV OFF
+  ['v1','v2','v3','v4','v5','v6','v7','v8','v9'].forEach(id=>valves[id].classList.remove('open'));
+  setSCSSV(false);
+
+  // Seed default lineup if none present
+  if (!localStorage.getItem(TRAINER_LINEUP_STEPS_KEY)) saveLineupSteps(DEFAULT_LINEUP_STEPS);
+  if (!localStorage.getItem(TRAINER_LINEUP_CFG_KEY)) saveLineupCfg(defaultLineupCfg);
+
+  // Initialize dynamic state
+  const d=load(DYN_KEY, DEFAULT_DYN);
+  phys.Pu = 0; phys.Pd = d.Pline; phys.dPu=0; phys.dPd=0;
+  startPhysics();
+
+  setTooltips(true);
+  repaintIdlePipes(); updateFlow(); applyV3V4Dynamics();
+  renderLineup();
+  refreshTrainerLock(); refreshTrainer();
+  renderActiveFaults();
+})();
+</script>
+</body>
+</html>
